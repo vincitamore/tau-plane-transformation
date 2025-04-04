@@ -1,0 +1,223 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>τ-Plane & Riemann Zeta Visualization</title>
+    <!-- Plotly.js CDN -->
+    <script src='https://cdn.plot.ly/plotly-latest.min.js'></script>
+    <!-- Custom CSS -->
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/styles.css') }}">
+    <!-- Favicon (optional) -->
+    <link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2290%22>🌌</text></svg>">
+    <!-- MathJax for LaTeX rendering -->
+    <script>
+    MathJax = {
+        tex: {
+            inlineMath: [['\\(', '\\)']],
+            displayMath: [['\\[', '\\]']],
+            processEscapes: true,
+            processEnvironments: true
+        },
+        options: {
+            skipHtmlTags: ['script', 'noscript', 'style', 'textarea', 'pre']
+        }
+    };
+    </script>
+    <script id="MathJax-script" async src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-mml-chtml.js"></script>
+</head>
+<body>
+    <header>
+        <h1>τ-Plane & Riemann Zeta Visualization</h1>
+        <p>Interactive exploration of transformed coordinate systems (τ = 1/z) and complex functions.</p>
+    </header>
+
+    <div class="container">
+        <aside class="controls">
+            <h2>Controls</h2>
+            
+            <div class="control-group">
+                <label for="functionSelect">Function:</label>
+                <select id="functionSelect">
+                    <option value="custom">Custom Function (Enter Below)</option>
+                    <option value="zeta" selected>Riemann Zeta Function</option>
+                    <option value="z*z-1">Quadratic: z² - 1</option>
+                    <option value="z*z*z-1">Cubic: z³ - 1</option>
+                    <option value="sin(z)">Sin(z)</option>
+                    <option value="exp(z)">e^z</option>
+                    <option value="log(z)">log(z)</option>
+                    <option value="1/(z*z+1)">1/(z² + 1)</option>
+                    <option value="(z*z-1)/(z*z+1)">Möbius: (z² - 1)/(z² + 1)</option>
+                    <option value="z^2*exp(-z*z)">z²·e^(-z²) (Gaussian-like)</option>
+                    <option value="z-z^3/6+z^5/120">Taylor Series: sin(z) ≈ z-z³/6+z⁵/120</option>
+                    <option value="z^2*log(z)">z²·log(z) (Branch Cut)</option>
+                    <option value="z*z*z*z+z*z+z">Polynomial: z⁴+z²+z</option>
+                </select>
+            </div>
+            
+            <div class="control-group function-input">
+                <label for="functionInput">Custom Function:</label>
+                <input type="text" id="functionInput" placeholder="sin(z)" value="sin(z)">
+                <div class="explanation">
+                    Use z as the variable. Available functions: sin, cos, tan, log, exp, sqrt, abs<br>
+                    Examples: z*z-1, sin(z), 1/(z*z+1), z^2 + exp(z), cos(z*pi)
+                </div>
+            </div>
+            
+            <div class="control-group">
+                <label for="planeSelect">Coordinate System:</label>
+                <select id="planeSelect">
+                    <option value="tau_plane" selected>τ-Plane (τ = 1/z)</option>
+                    <option value="z_plane">z-Plane (Direct)</option>
+                    <option value="w_plane">W-Plane (Logarithmic)</option>
+                </select>
+                <div class="explanation" id="plane-selector-explanation">
+                    <span id="tau-plane-explanation">Maps infinity to origin (0,0)</span>
+                    <span id="z-plane-explanation" style="display: none;">Direct function evaluation in τ-space</span>
+                    <span id="w-plane-explanation" style="display: none;">Logarithmic scaling: w = log(τ)</span>
+                </div>
+            </div>
+
+            <div class="control-group plane-explanation">
+                <div id="plane-explanation">
+                    <span id="tau-explanation">τ-plane: τ = 1/z places infinity at the origin</span>
+                    <span id="w-explanation" style="display: none;">W-plane: w = log(τ) = -log(z) applies logarithmic scaling</span>
+                    <span id="z-explanation" style="display: none;">z-plane: Direct function evaluation in τ-space (infinity at origin)</span>
+                </div>
+            </div>
+
+            <div class="control-group">
+                <label for="tauRange" id="rangeLabel">Range:</label>
+                <input type="range" id="tauRange" min="1" max="10" value="3" step="0.5">
+                <span id="tauRangeValue">±3.0</span>
+                <div class="explanation" id="range-explanation">
+                    <span id="tau-range-explanation">Range in τ-plane</span>
+                    <span id="w-range-explanation" style="display: none;">Range in w-plane (logarithmic scale)</span>
+                    <span id="z-range-explanation" style="display: none;">Range in z-plane</span>
+                </div>
+            </div>
+            
+            <div class="control-group">
+                <label for="pointsRange">Grid Points (per dimension):</label>
+                <input type="range" id="pointsRange" min="50" max="300" value="100" step="10">
+                <span id="pointsValue">100</span>
+            </div>
+
+            <div class="control-group" id="liminalZoneControl">
+                <label for="liminalZoneRange">Analysis Radius (ε):</label>
+                <input type="range" id="liminalZoneRange" min="0.1" max="2.5" value="1.0" step="0.1">
+                <span id="liminalZoneValue">1.0</span>
+                <div class="explanation" id="liminal-explanation">
+                    Dynamic analysis boundary for investigating function behavior at different distances from infinity
+                </div>
+            </div>
+
+            <div id="zetaControls">
+                <div class="control-group">
+                    <label for="numZerosRange">Number of Zeros:</label>
+                    <input type="range" id="numZerosRange" min="1" max="15" value="5" step="1">
+                    <span id="numZerosValue">5</span>
+                </div>
+                <div class="control-group">
+                    <label for="tMaxCritRange">Critical Line Range (t_max):</label>
+                    <input type="range" id="tMaxCritRange" min="10" max="200" value="50" step="10">
+                    <span id="tMaxCritValue">50</span>
+                </div>
+            </div>
+
+            <button id="updateButton">Update Plot</button>
+        </aside>
+
+        <main class="plots">
+            <div id="loadingIndicator" style="display: none;">Loading...</div>
+            <div class="plot-container">
+                <h3>Phase Plot</h3>
+                <div id="phasePlot"></div>
+            </div>
+            <div class="plot-container">
+                <h3>Magnitude Plot (Log Scale)</h3>
+                <div id="magnitudePlot"></div>
+            </div>
+            
+            <div class="plot-container">
+                <h3>2D Cartesian View</h3>
+                <div id="plot2d" class="cartesian-plot"></div>
+                <div class="plot-selector">
+                    <div class="radio-group">
+                        <label><input type="radio" name="plot2d-view" value="real" checked> Real Part</label>
+                        <label><input type="radio" name="plot2d-view" value="imag"> Imaginary Part</label>
+                    </div>
+                    <div class="radio-group">
+                        <label><input type="radio" name="plot2d-view" value="mag"> Magnitude</label>
+                        <label><input type="radio" name="plot2d-view" value="phase"> Phase</label>
+                    </div>
+                </div>
+                <div class="circles-legend" id="circles-legend" style="display: none;">
+                    <div><span class="circle-marker outer"></span> Boundary (±δ)</div>
+                    <div><span class="circle-marker liminal"></span> Liminal Circle (always at τ = 0.5δ)</div>
+                    <div><span class="circle-marker analysis"></span> Analysis Radius (adjustable)</div>
+                </div>
+            </div>
+            
+            <div id="function-analysis" class="analysis-panel" style="display: none;">
+                <h3>Function Analysis</h3>
+                <div class="latex-formula">
+                    <p>Current function: <span id="latex-function"></span></p>
+                </div>
+                <div id="analysis-content">
+                    <!-- Analysis content will be dynamically inserted here -->
+                </div>
+            </div>
+            
+            <div class="info-panel">
+                <h3>About the Visualization</h3>
+                <div id="tau-info">
+                    <p>The τ-plane is a reimagined Cartesian plane where τ = 1/z. This transformation:</p>
+                    <ul>
+                        <li>Places infinity at the origin (0,0)</li>
+                        <li>Maps the critical line to a curve</li>
+                        <li>Transforms the Riemann zeros to specific points</li>
+                    </ul>
+                </div>
+                <div id="w-info" style="display: none;">
+                    <p>The W-plane adds a logarithmic scaling to the τ-plane: w = log(τ) = -log(z).</p>
+                    <ul>
+                        <li>Compresses the infinite extent into a finite region</li>
+                        <li>Real part: w_x = log|τ| = -log|z|</li>
+                        <li>Imaginary part: w_y = arg(τ) = -arg(z)</li>
+                        <li>May reveal patterns in zero distribution</li>
+                    </ul>
+                </div>
+                <div id="z-info" style="display: none;">
+                    <p>The z-plane visualization shows the function evaluated directly in the τ-coordinate system, where:</p>
+                    <ul>
+                        <li>The origin (0,0) represents ±∞ in the conventional z-plane</li>
+                        <li>The axes are labeled using the approach: left side (-∞+1, -∞+2, ...) and right side (∞-1, ∞-2, ...)</li>
+                        <li>This special coordinate system places the conventional "infinity" at the origin instead of at the edges</li>
+                        <li>Functions are evaluated directly without the reciprocal transformation</li>
+                        <li>Zero is still excluded from the domain</li>
+                    </ul>
+                </div>
+                <div id="general-func-info" style="display: none;">
+                    <p>Custom function visualization allows you to:</p>
+                    <ul>
+                        <li>Enter any complex function using JavaScript syntax</li>
+                        <li>View it in either τ-plane or standard z-plane</li>
+                        <li>Compare how the transformation affects the function's representation</li>
+                        <li>Explore the concepts from the original conception document</li>
+                    </ul>
+                </div>
+            </div>
+        </main>
+    </div>
+
+    <footer>
+        <p>Exploring complex functions in novel coordinate systems.</p>
+    </footer>
+
+    <!-- Custom JavaScript -->
+    <script src="{{ url_for('static', filename='js/main.js') }}"></script>
+    <!-- Math.js for parsing and evaluating expressions -->
+    <script src="https://unpkg.com/mathjs@11.8.0/lib/browser/math.js"></script>
+</body>
+</html>
